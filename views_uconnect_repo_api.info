@@ -1,0 +1,18 @@
+;Id$
+
+name = Views UCARConnect Repository API
+description = Views plugin that provides a way to display data from the UCARConnect Repository
+version = "7.x-0"
+core = 7.x
+dependencies[] = uconnect
+package = "UCARConnect"
+
+files[] = handlers/views_uconnect_repo_api_handler_field.inc
+files[] = handlers/views_uconnect_repo_api_handler_field_url.inc
+files[] = handlers/views_uconnect_repo_api_handler_field_prerender_list.inc
+files[] = handlers/views_uconnect_repo_api_handler_filter_string.inc
+files[] = handlers/views_uconnect_repo_api_handler_filter_in_operator_education_level.inc
+files[] = handlers/views_uconnect_repo_api_handler_filter_in_operator_resource_type.inc
+files[] = handlers/views_uconnect_repo_api_handler_filter_in_operator_collection.inc
+files[] = handlers/views_uconnect_repo_api_handler_filter_in_operator_subject.inc
+files[] = plugins/views_uconnect_repo_api_plugin_query.inc

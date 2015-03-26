@@ -1,0 +1,31 @@
+You can alter how the search box and results display by adding javascript and css into your theme layer. 
+
+The following is an example with instructions for use.
+
+1. Copy the following folders into your theme folder
+    theme_layer/files/assets
+    theme_layer/files/templates
+2. Add the following code snippet to your theme's template.php file.  Be sure to change YOURTHEME to the name of your theme and change the conditions for the path to accomodate your chosen path in views
+
+
+    function YOURTHEME_preprocess_page(&$variables) {
+      $current_path = explode('/',current_path());
+
+        if(($current_path[0] == 'search' && $current_path[1] == 'resources')
+            // include multi-select plugin, css and styles for search box
+    		drupal_add_css(drupal_get_path('theme', 'uconnect').'/assets/scripts/multiselect/jquery.multiselect.css');
+            drupal_add_css(drupal_get_path('theme', 'uconnect').'/assets/scripts/multiselect/jquery.multiselect.filter.css');
+            drupal_add_css(drupal_get_path('theme', 'uconnect').'/assets/css/search.css');
+
+            drupal_add_library('system','ui.widget');
+
+            drupal_add_js(drupal_get_path('theme', 'uconnect').'/assets/scripts/multiselect/jquery.multiselect.js');
+            drupal_add_js(drupal_get_path('theme', 'uconnect').'/assets/scripts/multiselect/jquery.multiselect.filter.js');
+            drupal_add_js(drupal_get_path('theme', 'uconnect').'/assets/scripts/search.js');
+            
+            // standards formatting
+	    drupal_add_js(drupal_get_path('theme', 'uconnect').'/assets/scripts/standards_tree.js');
+        }
+    }
+    
+3. Clear caches to view.

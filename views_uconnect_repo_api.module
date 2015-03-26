@@ -1,0 +1,606 @@
+<?php
+/**
+ * Implementation of hook_views_api().
+ */
+function views_uconnect_repo_api_views_api() {
+	return array('api' => 3.0, );
+}
+
+/**
+ * Implements hook_theme().
+ */
+function views_uconnect_repo_api_theme() {
+	return array('views_uconnect_repo_api_proxy_view' => array(
+			'variables' => array('url' => NULL),
+			'template' => 'views-uconnect-repo-api-proxy-view',
+		), );
+}
+
+/**
+ * Implements hook_menu().
+ */
+function views_uconnect_repo_api_menu() {
+	$items['proxy/search/%/%'] = array(
+		'title' => 'Search Proxy',
+		'title callback' => 'views_uconnect_repo_api_title_callback',
+		'title arguments' => array(
+			2,
+			3
+		),
+		'page arguments' => array(
+			2,
+			3
+		),
+		'page callback' => 'views_uconnect_repo_api_proxy_view',
+		'access arguments' => array('access content'),
+		'type' => MENU_CALLBACK,
+	);
+
+	return $items;
+}
+
+/* get the title */
+function views_uconnect_repo_api_title_callback($arg1, $arg2) {
+	// retrieve title from API
+	$id = $arg1 . '/' . $arg2;
+	$xml = views_uconnect_repo_api_get_record($id);
+	$title = (string)$xml -> GetRecord -> record -> metadata -> uconnect_dc -> title;
+	return $title;
+}
+
+function views_uconnect_repo_api_proxy_view($arg1, $arg2) {
+	// TODO: retrieve URL from API
+	// TODO: Display in an iframe
+	$results = '';
+	$id = $arg1 . '/' . $arg2;
+	//views_uconnect_repo_api_clear_record($id);
+	$xml = views_uconnect_repo_api_get_record($id);
+
+	$identifiers = $xml -> GetRecord -> record -> metadata -> uconnect_dc -> identifier;
+
+	foreach ($identifiers as $index => $value) {
+		if ((string)$value -> attributes() -> type == 'dct:URI') {
+			$url = (string)$value;
+			break;
+		}
+	}
+
+	$results = theme('views_uconnect_repo_api_proxy_view', array('url' => $url));
+
+	return $results;
+
+}
+
+function views_uconnect_repo_api_clear_record($id) {
+	cache_clear_all($id, 'cache', TRUE);
+}
+
+function views_uconnect_repo_api_get_record($id) {
+	$data = &drupal_static(__FUNCTION__);
+	if (!isset($data)) {
+		//TODO: can I get this base url from views?
+		if ($cache = cache_get($id)) {
+			$data = $cache -> data;
+		}
+		else {
+			// Do your expensive calculations here, and populate $my_data
+			// with the correct stuff..
+			$url = 'http://uc.dls.ucar.edu/search-api?verb=GetRecord&transform=localize&id=' . $id;
+
+			$results = drupal_http_request($url);
+			$data = $results -> data;
+			//note cannot store xml in cache
+			cache_set($id, $data, 'cache', time() + 360);
+
+		}
+	}
+	$xml = new SimpleXMLElement($data);
+	return $xml;
+}
+
+/**
+ * Implements hook_views_pre_render().
+ */
+function views_uconnect_repo_api_views_pre_render(&$view) {
+	if ($view -> base_table == 'views_uconnect_repo_api') {
+		// create filter indicators
+		if ((isset($view -> query -> request_arguments['edLevel_filter']) && count($view -> query -> request_arguments['edLevel_filter']) > 0) || 
+		    (isset($view -> query -> request_arguments['type_filter']) && count($view -> query -> request_arguments['type_filter']) > 0) || 
+		    (isset($view -> query -> request_arguments['subject_filter']) && count($view -> query -> request_arguments['subject_filter']) > 0) || 
+		    (isset($view -> query -> request_arguments['collection_filter']) && count($view -> query -> request_arguments['collection_filter'])) > 0) {
+			$orig_query = $view -> query -> request_arguments;
+
+			$filters = '<div class="view-result-filters"><h3>Your selections</h3>';
+			if (count($view -> query -> request_arguments['edLevel_filter']) > 0) {
+				// add remove options to filters
+				$a_toList = array();
+				$temp_query = $orig_query;
+				foreach ($view->query->request_arguments['edLevel_filter'] as $index => $value) {
+					unset($temp_query[edLevel_filter][$value]);
+					$a_toList[$value] = $temp_query;
+				}
+				$filters .= '<div class="view-result-filter"><span class="views-label">Education Level:</span> <span class="field_content">';
+
+				$a_query = array();
+				foreach ($a_toList as $index => $value) {
+					$a_query[] = $index . ' <a href="?' . implode('&', uconnect_form_query($value)) . '"><img src="/' . drupal_get_path('module', 'views_uconnect_repo_api') . '/img/remove.gif" alt="Remove from query" title="Remove from query"/></a>';
+				}
+				$filters .= implode(',', $a_query);
+				$filters .= '</span></div>';
+
+			}
+			if (count($view -> query -> request_arguments['type_filter']) > 0) {
+				// add remove options to filters
+				$a_toList = array();
+				$temp_query = $orig_query;
+				foreach ($view->query->request_arguments['type_filter'] as $index => $value) {
+					unset($temp_query[type_filter][$value]);
+					$a_toList[$value] = $temp_query;
+				}
+				$filters .= '<div class="view-result-filter"><span class="views-label">Resource Type:</span> <span class="field_content">';
+
+				$a_query = array();
+				foreach ($a_toList as $index => $value) {
+					$a_query[] = $index . ' <a href="?' . implode('&', uconnect_form_query($value)) . '"><img src="/' . drupal_get_path('module', 'views_uconnect_repo_api') . '/img/remove.gif" alt="Remove from query" title="Remove from query"/></a>';
+				}
+				$filters .= implode(',', $a_query);
+				$filters .= '</span></div>';
+			}
+			if (count($view -> query -> request_arguments['subject_filter']) > 0) {
+				// add remove options to filters
+				$a_toList = array();
+				$temp_query = $orig_query;
+				foreach ($view->query->request_arguments['subject_filter'] as $index => $value) {
+					unset($temp_query[subject_filter][$value]);
+					$a_toList[$value] = $temp_query;
+				}
+				$filters .= '<div class="view-result-filter"><span class="views-label">Subject:</span> <span class="field_content">';
+
+				$a_query = array();
+				foreach ($a_toList as $index => $value) {
+					$a_query[] = $index . ' <a href="?' . implode('&', uconnect_form_query($value)) . '"><img src="/' . drupal_get_path('module', 'views_uconnect_repo_api') . '/img/remove.gif" alt="Remove from query" title="Remove from query"/></a>';
+				}
+				$filters .= implode(',', $a_query);
+				$filters .= '</span></div>';
+			}
+			if (count($view -> query -> request_arguments['collection_filter']) > 0) {
+				// add remove options to filters
+				$a_toList = array();
+
+				foreach ($view->query->request_arguments['collection_filter'] as $index => $value) {
+					$temp_query = $orig_query;
+					unset($temp_query[collection_filter][$value]);
+					$a_toList[$value] = $temp_query;
+
+				}
+
+				// resolve names
+				$a_colls = array();
+				$colls = variable_get('uconnect_collection_master');
+				foreach ($a_toList as $index => $value) {
+					foreach ($colls as $coll_ind => $coll_val) {
+						if ($coll_val['id'] == $index) {
+
+							$a_colls[$index] = $colls[$coll_ind]['name'];
+							break;
+						}
+					}
+				}
+
+				$filters .= '<div class="view-result-filter"><span class="views-label">Collection:</span> <span class="field_content">';
+
+				$a_query = array();
+				foreach ($a_toList as $index => $value) {
+					if (strpos($a_colls[$index], ':') > 0) {
+						$display_name = substr($a_colls[$index], 0, strpos($a_colls[$index], ':'));
+						;
+					}
+					else {
+						$display_name = $a_colls[$index];
+					}
+
+					$a_query[] = $display_name . ' <a href="?' . implode('&', uconnect_form_query($value)) . '"><img src="/' . drupal_get_path('module', 'views_uconnect_repo_api') . '/img/remove.gif" alt="Remove from query" title="Remove from query"/></a>';
+
+				}
+
+				$filters .= implode(',', $a_query);
+				$filters .= '</span></div>';
+			}
+			$filters .= '</div>';
+
+			// inject filters so they appear to be inside the search box
+			$insert_pt = strlen($view -> exposed_widgets) - 20;
+			$view -> exposed_widgets = substr_replace($view -> exposed_widgets, $filters, $insert_pt, 0);
+
+		}
+
+		// create results available display
+		if (count($view -> result) > 0) {
+			$output = '';
+			$from = ($view -> query -> pager -> current_page * $view -> query -> pager -> options['items_per_page']) + 1;
+			$to = $from + count($view -> result) - 1;
+			$total = $view -> query -> pager -> total_items;
+			$output .= '<div class="views-result-count">';
+			$output .= 'Showing ' . $from . ' - ' . $to . ' of ' . $total . ' results';
+			$output .= '</div>';
+
+			$view -> attachment_before = $output;
+		}
+
+		// adjust metadata in items to be clickable
+
+		// get the query for processing
+		$query = $view -> query;
+		$exposed_data = $view -> exposed_data;
+		$query_str = '';
+
+		if (isset($exposed_data['term'])) {
+			$query_str .= 'term=' . $exposed_data['term'];
+		}
+		else {
+			$query_str .= 'term=';
+		}
+		if (isset($exposed_data['edLevel_filter']) && count($exposed_data['edLevel_filter']) > 0) {
+			foreach ($exposed_data['edLevel_filter'] as $index => $value) {
+				$query_str .= '&edLevel_filter[]=' . $value;
+			}
+		}
+		if (isset($exposed_data['type_filter']) && count($exposed_data['type_filter']) > 0) {
+			foreach ($exposed_data['type_filter'] as $index => $value) {
+				$query_str .= '&type_filter[]=' . $value;
+			}
+		}
+
+		if (isset($exposed_data['subject_filter']) && count($exposed_data['subject_filter']) > 0) {
+			foreach ($exposed_data['subject_filter'] as $index => $value) {
+				$query_str .= '&subject_filter[]=' . $value;
+			}
+		}
+
+		if (isset($exposed_data['collection_filter']) && count($exposed_data['collection_filter']) > 0) {
+			foreach ($exposed_data['collection_filter'] as $index => $value) {
+				$query_str .= '&collection_filter[]=' . $value;
+			}
+		}
+		$search_base_url = '/search/resources?' . $query_str;
+		// get each result and its edLevel, subject, type, and collection
+		foreach ($view->result as $index => $value) {
+
+			foreach ($value->items->subject as $sub_index => $sub_value) {
+				// check if term is already in filters
+				if (isset($exposed_data['subject_filter']) && !in_array($sub_value, $exposed_data['subject_filter'])) {
+					$search_url = $search_base_url . '&subject_filter[]=' . $sub_value;
+					$view -> result[$index] -> items -> subject[$sub_index] = '<a href="' . $search_url . '">' . $sub_value . '</a>';
+				}
+				else {
+					$view -> result[$index] -> items -> subject[$sub_index] = $sub_value;
+				}
+
+			}
+			foreach ($value->items->edLevel as $sub_index => $sub_value) {
+				if (!in_array($sub_value, $exposed_data['edLevel_filter'])) {
+					$search_url = $search_base_url . '&edLevel_filter[]=' . $sub_value;
+					$view -> result[$index] -> items -> edLevel[$sub_index] = '<a href="' . $search_url . '">' . $sub_value . '</a>';
+				}
+				else {
+					$view -> result[$index] -> items -> edLevel[$sub_index] = $sub_value;
+				}
+			}
+			foreach ($value->items->type as $sub_index => $sub_value) {
+				if (!in_array($sub_value, $exposed_data['type_filter'])) {
+					$search_url = $search_base_url . '&type_filter[]=' . $sub_value;
+					$view -> result[$index] -> items -> type[$sub_index] = '<a href="' . $search_url . '">' . $sub_value . '</a>';
+				}
+				else {
+					$view -> result[$index] -> items -> type[$sub_index] = $sub_value;
+				}
+			}
+
+			$a_stds_list = array();
+			// can group standards together
+			if (count($value -> items -> standard) > 0) {
+				$service_url = variable_get('uconnect_asn_standard_service_url') . implode('&id=', array_map('urlencode', $value -> items -> standard));
+				$results_obj = uconnect_query_service($service_url);
+				if ($results_obj != false) {
+					$xml = new SimpleXMLElement($results_obj -> data);
+					foreach ($xml->ListStandards->results->result as $sub_index => $result) {
+
+						$a_stds = array();
+						uconnect_asn_standard_resolve_text($result -> Standard, $a_stds, true);
+						$a_stds_list[] = $a_stds;
+
+					}
+					$res = call_user_func_array('array_merge_recursive', $a_stds_list);
+					// now recursive sort this list
+					ksort($res);
+					$res = _sort_levels($res);
+
+					// from here, if ngss exists, pull it out and resort
+					// now re-sort
+					/*
+					 * 1. Remove codes from top level
+					 * 2. eliminate "Students who demonstrate understanding can:"
+					 * 3. sort next level by grade levels
+					 * 4. following level is text
+					 * 5. merge by key recursive
+					 *
+					 */
+
+					if (isset($res['Next Generation Science Standards'])) {
+						$temp = array();
+						$ngss = $res['Next Generation Science Standards'];
+
+						foreach ($ngss as $index1 => $subject) {
+							// strip off code
+							$spc = explode(' ', $index1);
+							if (preg_match('/\d$/', $spc[0])) {
+								// strip off the number
+								$spc[0] = preg_replace("/\d+$/", "", $spc[0]);
+								
+								
+								// split by - and remove the first part
+								$a_spc_temp = explode('-',$spc[0]);
+								if(count($a_spc_temp) > 1){
+									array_shift($a_spc_temp);
+								}
+								$spc[0] = implode(' ',$a_spc_temp);
+							}
+							
+							
+							$new_index = implode(' ', $spc);
+							if (!array_key_exists($new_index, $temp)) {
+								$temp[$new_index] = array();
+							}
+
+							// now next level
+							foreach ($subject as $index2 => $value2) {
+								if ($index2 != 'Students who demonstrate understanding can:') {
+									// check if exists and add
+									if (!array_key_exists($index2, $temp[$new_index])) {
+										$temp[$new_index][$index2] = array();
+									}
+									// go into next level
+									foreach ($value2 as $index3 => $value3) {
+										// force 'Grades' to be 'Grade' for better sorting
+										$index3 = str_replace('Grades', 'Grade', $index3);
+										// leave out the blah blah in [grades] builds on [grade] from science and engineering level
+										
+										if (!preg_match('/builds on/', $index3)) {
+											if (!array_key_exists($index3, $temp[$new_index][$index2])) {
+												$temp[$new_index][$index2][$index3] = array();
+											}
+											
+											//go into next level
+											foreach ($value3 as $index4 => $value4) {
+												// force 'Grades' to be 'Grade' for better sorting
+												$index4 = str_replace('Grades', 'Grade', $index4);
+
+												if (!array_key_exists($index4, $temp[$new_index][$index2][$index3])) {
+													$temp[$new_index][$index2][$index3][$index4] = array();
+												}
+
+												// next level
+												foreach ($value4 as $index5 => $value5) {
+													if (!array_key_exists($index5, $temp[$new_index][$index3][$index4])) {
+														$temp[$new_index][$index3][$index4][$index5] = array();
+													}
+												}
+											}
+										} else {
+											// proceed 
+											//go into next level
+											foreach ($value3 as $index4 => $value4) {
+												// force 'Grades' to be 'Grade' for better sorting
+												$index4 = str_replace('Grades', 'Grade', $index4);
+
+												if (!array_key_exists($index4, $temp[$new_index][$index2])) {
+													$temp[$new_index][$index2][$index4] = array();
+												}
+
+												// next level
+												foreach ($value4 as $index5 => $value5) {
+													if (!array_key_exists($index5, $temp[$new_index][$index2][$index4])) {
+														$temp[$new_index][$index2][$index4][$index5] = array();
+													}
+												}
+											}
+										}
+
+									}
+								}
+								else {
+									// skip and go into the next level but apply at this level
+									foreach ($value2 as $index3 => $value3) {
+										// force 'Grades' to be 'Grade' for better sorting
+										$index3 = str_replace('Grades', 'Grade', $index3);
+										if (!array_key_exists($index3, $temp[$new_index])) {
+											$temp[$new_index][$index3] = array();
+										}
+
+										// next level
+										foreach ($value3 as $index4 => $value4) {
+											if (!array_key_exists($index4, $temp[$new_index][$index3])) {
+												$temp[$new_index][$index3][$index4] = array();
+											}
+
+											// next level
+											foreach ($value4 as $index5 => $value5) {
+												if (!array_key_exists($index5, $temp[$new_index][$index3][$index4])) {
+													$temp[$new_index][$index3][$index4][$index5] = array();
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+						$temp = _sort_levels($temp);
+						// now, ensure that DCI, CC, and SEP are first in list
+						$a_ngss_order = array('Disciplinary Core Ideas'=> array(),'Crosscutting Concepts'=> array(),'Science and Engineering Practices'=> array());
+						if(isset($temp['Disciplinary Core Ideas'])){
+							$a_ngss_order['Disciplinary Core Ideas'] = $temp['Disciplinary Core Ideas'];
+							unset($temp['Disciplinary Core Ideas']);
+						} else {
+							unset($a_ngss_order['Disciplinary Core Ideas']);
+						}
+						
+						if(isset($temp['Crosscutting Concepts'])){
+							$a_ngss_order['Crosscutting Concepts'] = $temp['Crosscutting Concepts'];
+							unset($temp['Crosscutting Concepts']);
+						} else {
+							unset($a_ngss_order['Crosscutting Concepts']);
+						}
+						
+						if(isset($temp['Science and Engineering Practices'])){
+							$a_ngss_order['Science and Engineering Practices'] = $temp['Science and Engineering Practices'];
+							unset($temp['Science and Engineering Practices']);
+						} else {
+							unset($a_ngss_order['Science and Engineering Practices']);
+						}
+						$temp = $a_ngss_order+ $temp;
+						
+						$res['Next Generation Science Standards'] = $temp;
+
+					}
+					unset($view -> result[$index] -> items -> standard);
+
+					$str = '';
+					views_uconnect_repo_api_recursive_tree($res, $str, TRUE);
+					$view -> result[$index] -> items -> standard[] = $str;
+				}
+			}
+
+			foreach ($value->items->collection as $sub_index => $sub_value) {
+				// for this one, we need to look up the collection key
+
+				if (!in_array($sub_value['key'], $exposed_data['collection_filter'])) {
+					$colls = variable_get('uconnect_collection_master');
+					$coll_key = '';
+					foreach ($colls as $coll_index => $coll_value) {
+						if ($coll_value['name'] == $sub_value['name']) {
+							$coll_key = $coll_value['id'];
+						}
+					}
+					$search_url = $search_base_url . '&collection_filter[]=' . $coll_key;
+					$view -> result[$index] -> items -> collection[$sub_index] = '<a href="' . $search_url . '">' . $sub_value['name'] . '</a>';
+				}
+				else {
+					$view -> result[$index] -> items -> collection[$sub_index] = $sub_value['name'];
+				}
+			}
+		}
+	}
+
+}
+
+function array_argFunc($a, $b, $c) {
+	var_dump($a, $b, $c);
+	// 1 2 3
+}
+
+function uconnect_form_query($array) {
+	$a_query = array();
+	if (!empty($array['term'])) {
+		$a_query[] = 'term=' . (string)$array['term'];
+	}
+	if (count($array['edLevel_filter'] > 0)) {
+		foreach ($array['edLevel_filter'] as $index => $value) {
+			$a_query[] = 'edLevel_filter[]=' . $value;
+		}
+	}
+	if (count($array['type_filter'] > 0)) {
+		foreach ($array['type_filter'] as $index => $value) {
+			$a_query[] = 'type_filter[]=' . $value;
+		}
+	}
+	if (count($array['subject_filter'] > 0)) {
+		foreach ($array['subject_filter'] as $index => $value) {
+			$a_query[] = 'subject_filter[]=' . $value;
+		}
+	}
+	if (count($array['collection_filter'] > 0)) {
+		foreach ($array['collection_filter'] as $index => $value) {
+			$a_query[] = 'collection_filter[]=' . $value;
+		}
+	}
+
+	return $a_query;
+}
+
+function views_uconnect_repo_api_recursive_tree($ary, &$str, $first_in = FALSE) {
+	$str .= '<ul>';
+	$a_current = array();
+	foreach ($ary as $index => $value) {
+		if (is_array($value) && count($value) > 0) {
+			if ($first_in == TRUE) {
+				$str .= '<li><strong>' . $index . '</strong>';
+			}
+			else {
+				$str .= '<li>' . $index;
+			}
+			views_uconnect_repo_api_recursive_tree($value, $str);
+			$str .= '</li>';
+		}
+		else if (!in_array($index, $a_current)) {
+			// need to calc similarity index
+			$similar = false;
+
+			foreach ($a_current as $cur_index => $cur_val) {
+				similar_text($index, $a_current[$cur_index], $sim);
+				if ($sim > 85) {
+					$similar = true;
+				}
+			}
+			if ($similar == false) {
+				$str .= '<li>' . $index . '</li>';
+			}
+		}
+		$a_current[] = $index;
+	}
+
+	$str .= '</ul>';
+
+}
+
+function _sort_levels($ary) {
+	// put all keys in array
+	// sort and restore
+	// if sub part is array then recursive
+
+	$a_temp = array();
+	$new_level = array();
+	$a_master = array();
+	$grade_switch = FALSE;
+	foreach ($ary as $index => $values) {
+		// change K to 0 for each sorting of grade
+		if (preg_match('/^Grade/', $index) != FALSE) {
+			$grade_switch = TRUE;
+			$a_temp[] = str_replace('K', '0', $index);
+		}
+		else {
+			$a_temp[] = $index;
+		}
+	}
+	natcasesort($a_temp);
+	// replace K with 0 if needed
+	if ($grade_switch == TRUE) {
+		foreach ($a_temp as $index => $value) {
+			if (preg_match('/^Grade/', $value) != FALSE) {
+				$a_temp[$index] = str_replace('0', 'K', $value);
+			}
+
+		}
+	}
+
+	foreach ($a_temp as $index => $values) {
+		if (is_array($ary[$values])) {
+			$new_level[$values] = _sort_levels($ary[$values]);
+		}
+		else {
+			$new_level[$values] = $values;
+		}
+		$a_master[$values] = $new_level[$values];
+	}
+	return $a_master;
+}
+?>

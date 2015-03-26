@@ -1,0 +1,9 @@
+<?php
+/**
+ * Implements hook_schema().
+ * 
+ */
+function views_uconnect_repo_api_schema() {
+  $schema['cache_views_uconnect_repo_api'] = drupal_get_schema_unprocessed('system', 'cache');
+  return $schema;
+}
