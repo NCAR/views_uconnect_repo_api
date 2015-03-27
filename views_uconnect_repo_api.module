@@ -10,9 +10,25 @@ function views_uconnect_repo_api_views_api() {
  * Implements hook_theme().
  */
 function views_uconnect_repo_api_theme() {
-	return array('views_uconnect_repo_api_proxy_view' => array(
-			'variables' => array('url' => NULL),
-			'template' => 'views-uconnect-repo-api-proxy-view',
+	return array('views_uconnect_repo_api_detail_view' => array(
+			'variables' => array(
+				'id' => NULL,
+				'url' => NULL,
+				'title' => NULL,
+				'description' => NULL,
+				'license' => NULL,
+				'accessRights' => NULL,
+				'audience' => NULL,
+				'type' => NULL,
+				'format' => NULL,
+				'subject' => NULL,
+				'educationLevel' => NULL,
+				'language' => NULL,
+				'creator' => NULL,
+				'rights' => NULL,
+				'img' => NULL
+			),
+			'template' => 'views-uconnect-repo-api-detail-view',
 		), );
 }
 
@@ -20,8 +36,8 @@ function views_uconnect_repo_api_theme() {
  * Implements hook_menu().
  */
 function views_uconnect_repo_api_menu() {
-	$items['proxy/search/%/%'] = array(
-		'title' => 'Search Proxy',
+	$items['search/details/%/%'] = array(
+		'title' => 'Search Resource Details',
 		'title callback' => 'views_uconnect_repo_api_title_callback',
 		'title arguments' => array(
 			2,
@@ -31,7 +47,7 @@ function views_uconnect_repo_api_menu() {
 			2,
 			3
 		),
-		'page callback' => 'views_uconnect_repo_api_proxy_view',
+		'page callback' => 'views_uconnect_repo_api_detail_view',
 		'access arguments' => array('access content'),
 		'type' => MENU_CALLBACK,
 	);
@@ -44,28 +60,151 @@ function views_uconnect_repo_api_title_callback($arg1, $arg2) {
 	// retrieve title from API
 	$id = $arg1 . '/' . $arg2;
 	$xml = views_uconnect_repo_api_get_record($id);
-	$title = (string)$xml -> GetRecord -> record -> metadata -> uconnect_dc -> title;
+	$title = (string)$xml -> GetRecord -> record -> metadata -> nsdl_dc -> title;
 	return $title;
 }
 
-function views_uconnect_repo_api_proxy_view($arg1, $arg2) {
-	// TODO: retrieve URL from API
-	// TODO: Display in an iframe
+function views_uconnect_repo_api_detail_view($arg1, $arg2) {
 	$results = '';
 	$id = $arg1 . '/' . $arg2;
-	//views_uconnect_repo_api_clear_record($id);
+	$nid = $repo_id = $img = $conformsTo = $language = $creator = $rights = $type = $format = $subject = $educationLevel = $title = $description = $license = $accessRights = '';
+	$md = array();
 	$xml = views_uconnect_repo_api_get_record($id);
+	$base = $xml -> Search -> results -> record -> metadata -> nsdl_dc;
+	$identifiers = $base -> identifier;
 
-	$identifiers = $xml -> GetRecord -> record -> metadata -> uconnect_dc -> identifier;
+	foreach($xml -> Search -> results -> record -> storedContent -> content as $index=>$content){
+	
+		if(!array_key_exists((string)$content->attributes()->fieldName,$md)){
+			$md[(string)$content->attributes()->fieldName] = array();
+		} 
+		$md[(string)$content->attributes()->fieldName][] =(string)$content;
 
+	}
+	// ensure unique values
+	foreach($md as $index=>$values){
+		$md[$index] = array_unique($values);
+	}
+	
 	foreach ($identifiers as $index => $value) {
 		if ((string)$value -> attributes() -> type == 'dct:URI') {
 			$url = (string)$value;
 			break;
 		}
 	}
+	// type
+	$temp = $md['/text//nsdl_dc/type'];
+	sort($temp);
+	$type = implode(', ',$temp);
+	
+	$temp = $md['/text//nsdl_dc/format'];
+	sort($temp);
+	$format = implode(', ',$temp);
+	
+	$temp = $md['/text//nsdl_dc/subject'];
+	natsort($temp);
+	$subject = implode(', ',$temp);
+	
+	$temp = $md['/text//nsdl_dc/educationLevel'];
+	$a_master_order = variable_get('uconnect_edlevel_master_order');
+	$a_temp_list = array();
+	foreach ($a_master_order as $index => $data) {
+		if (in_array($data, $temp)) {
+			$a_temp_list[] = $data;
+		}
+	}
+	$temp = $a_temp_list;
+	$educationLevel = implode(', ',$temp);
+	
+	$temp = $md['/text//nsdl_dc/title'];
+	// pick first title
+	$title = $temp[0];
+	
+	$temp = $md['/text//nsdl_dc/description'];
+	sort($temp);
+	$description = implode('',array_map(function($el){ return '<p>'.$el.'</p>';},$temp));
+	
+	$temp = $md['/text//nsdl_dc/license'];
+	sort($temp);
+	$license = implode('',array_map(function($el){ return '<p>'.$el.'</p>';},$temp));
+	
+	$temp = $md['/text//nsdl_dc/accessRights'];
+	sort($temp);
+	$accessRights = implode('',array_map(function($el){ return '<p>'.$el.'</p>';},$temp));
+	
+	$temp = $md['/text//nsdl_dc/language'];
+	sort($temp);
+	$language = implode('',array_map(function($el){ return '<p>'.$el.'</p>';},$temp));
+	
+	$temp = $md['/text//nsdl_dc/creator'];
+	sort($temp);
+	$creator = implode(', ',$temp);
+	
+	$temp = $md['/text//nsdl_dc/rights'];
+	sort($temp);
+	$rights = implode('',array_map(function($el){ return '<p>'.$el.'</p>';},$temp));
+	
+	$temp = $md['/text//nsdl_dc/conformsTo'];
+	// need to resolve standards
+	$conformsTo = implode(', ',$temp);
 
-	$results = theme('views_uconnect_repo_api_proxy_view', array('url' => $url));
+	// also check uconnect_ed_resources to see if a picture exists.  Can searchby URL or id.
+	$query = new EntityFieldQuery;
+	$query->entityCondition('entity_type','node')
+	      ->entityCondition('bundle','ucar_education_resource')
+		  ->fieldCondition('field_url','value',$url);
+	$results = $query->execute();
+	if (isset($results['node']) && count($results['node']) > 0) {
+		 if(count($results['node']) > 1){
+		 	// if there are more than 1, send notice
+		 	watchdog('views_uconnect_repo_api', 'NOTICE: Resource has multiple entries in the Drupal database %url', array('%url' => $url), WATCHDOG_NOTICE);
+		 }
+
+	  $nodes = node_load_multiple(array_keys($results['node']));
+	
+	  foreach ($nodes as $node) {
+	    $img_value = field_get_items('node', $node, 'field_image');
+		$repo_id = field_get_items('node', $node, 'field_repository_id');
+	  	$nid = $node->nid;
+	  }
+
+	  // check if id exists, otherwise add it to node
+	  if(empty($repo_id)){
+	  	$node = node_load($nid);
+
+	    $node->field_repository_id[LANGUAGE_NONE][0]['value'] =$id;
+	    node_save($node);
+	  }
+	  
+	  if ($img_value) {
+		  // for displaying the original image
+		  $img_url = $img_value[0]['uri'];
+			$style = 'feature_medium_220x147px';
+			$img = image_style_url($style, $img_url);
+		}
+	}
+
+	
+	
+	drupal_set_title($title);
+	$results = theme('views_uconnect_repo_api_detail_view', array(
+		'id' => $id,
+		'url' => $url,
+		'title' => $title,
+		'description' => $description,
+		'license' => $license,
+		'accessRights' => $accessRights,
+		'audience' => $audience,
+		'type' => $type,
+		'format' => $format,
+		'subject' => $subject,
+		'educationLevel' => $educationLevel,
+		'language' => $language,
+		'creator' => $creator,
+		'rights' => $rights,
+		'conformsTo' => $conformsTo,
+		'img' => $img
+	));
 
 	return $results;
 
@@ -83,13 +222,13 @@ function views_uconnect_repo_api_get_record($id) {
 			$data = $cache -> data;
 		}
 		else {
-			// Do your expensive calculations here, and populate $my_data
-			// with the correct stuff..
-			$url = 'http://uc.dls.ucar.edu/search-api?verb=GetRecord&transform=localize&id=' . $id;
-
+			$general_stored_content = '&storedContent=/text//nsdl_dc/conformsTo&storedContent=/text//nsdl_dc/educationLevel&storedContent=/text//nsdl_dc/subject&storedContent=/text//nsdl_dc/type&storedContent=/text//nsdl_dc/description&storedContent=/text//nsdl_dc/title&storedContent.mode=multiRecord';
+			$record_stored_content = '&storedContent=commonComments&storedContent=/key//nsdl_dc/audience&storedContent=/text//nsdl_dc/accessRights&storedContent=/text//nsdl_dc/language&storedContent=/text//nsdl_dc/license&storedContent=/text//nsdl_dc/publisher&storedContent=/text//nsdl_dc/rights&storedContent=/text//nsdl_dc/creator&storedContent=/text//nsdl_dc/format';
+			$s_post_params = 'response=allCollectionsMetadata&transform=localize&verb=Search&n=10&s=0&q=/key//nsdl_dc/identifier:"hdl:'.$id.'"'.$record_stored_content.$general_stored_content;
+			$url = 'http://uc.dls.ucar.edu/search-api?'.$s_post_params;
+			
 			$results = drupal_http_request($url);
 			$data = $results -> data;
-			//note cannot store xml in cache
 			cache_set($id, $data, 'cache', time() + 360);
 
 		}

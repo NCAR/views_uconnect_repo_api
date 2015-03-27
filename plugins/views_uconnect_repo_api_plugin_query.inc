@@ -315,7 +315,6 @@ class views_uconnect_repo_api_plugin_query extends views_plugin_query {
 			// TODO:  for collection filter at this point, the goal is just to make
 			// it available to tokens, so may want to resolve this to the collection name
 			$row -> items -> collection_filter = $a_search_criteria['collection_filter'];
-
 			// title
 			$row -> title = (string)$record -> metadata -> nsdl_dc -> title;
 			// description
@@ -340,16 +339,7 @@ class views_uconnect_repo_api_plugin_query extends views_plugin_query {
 			// order
 			// sort according to grade level order
 			//$a_master_order = array('Elementary School', 'Lower Elementary', 'Upper Elementary', 'Middle School', 'High School', 'Higher Education', 'Vocational/Professional Development Education', 'Undergraduate (Lower Division)', 'Undergraduate (Upper Division)', 'Graduate/Professional');
-			$a_master_order = array(
-				'Pre-Kindergarten',
-				'Elementary School',
-				'Middle School',
-				'High School',
-				'Higher Education',
-				'Informal Education',
-				'Vocational/Professional Development Education',
-				'Graduate/Professional'
-			);
+			$a_master_order = variable_get('uconnect_edlevel_master_order');
 			$a_temp_list = array();
 			foreach ($a_master_order as $index => $data) {
 				if (in_array($data, $a_edLevel)) {
