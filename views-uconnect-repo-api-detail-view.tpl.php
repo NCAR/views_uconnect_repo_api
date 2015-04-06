@@ -17,6 +17,12 @@
 		<td><?php echo $subject;?></td>
 	</tr>
 	<?php } ?>
+	<?php if(!empty($keyword)){?>
+	<tr>
+		<th>Keywords</th>
+		<td><?php echo $keyword;?></td>
+	</tr>
+	<?php } ?>
 	<?php if(!empty($type)){?>
 	<tr>
 		<th>Resource Type</th>
