@@ -285,12 +285,12 @@ function views_uconnect_repo_api_views_pre_render(&$view) {
 			$orig_query = $view -> query -> request_arguments;
 
 			$filters = '<div class="view-result-filters"><h3>Your selections</h3>';
-			if (count($view -> query -> request_arguments['edLevel_filter']) > 0) {
+			if (isset($view -> query -> request_arguments['edLevel_filter']) && count($view -> query -> request_arguments['edLevel_filter']) > 0) {
 				// add remove options to filters
 				$a_toList = array();
 				$temp_query = $orig_query;
 				foreach ($view->query->request_arguments['edLevel_filter'] as $index => $value) {
-					unset($temp_query[edLevel_filter][$value]);
+					unset($temp_query['edLevel_filter'][$value]);
 					$a_toList[$value] = $temp_query;
 				}
 				$filters .= '<div class="view-result-filter"><span class="views-label">Education Level:</span> <span class="field_content">';
@@ -303,7 +303,7 @@ function views_uconnect_repo_api_views_pre_render(&$view) {
 				$filters .= '</span></div>';
 
 			}
-			if (count($view -> query -> request_arguments['type_filter']) > 0) {
+			if (isset($view -> query -> request_arguments['type_filter']) && count($view -> query -> request_arguments['type_filter']) > 0) {
 				// add remove options to filters
 				$a_toList = array();
 				$temp_query = $orig_query;
@@ -320,7 +320,7 @@ function views_uconnect_repo_api_views_pre_render(&$view) {
 				$filters .= implode(',', $a_query);
 				$filters .= '</span></div>';
 			}
-			if (count($view -> query -> request_arguments['subject_filter']) > 0) {
+			if (isset($view -> query -> request_arguments['subject_filter']) && count($view -> query -> request_arguments['subject_filter']) > 0) {
 				// add remove options to filters
 				$a_toList = array();
 				$temp_query = $orig_query;
@@ -337,13 +337,13 @@ function views_uconnect_repo_api_views_pre_render(&$view) {
 				$filters .= implode(',', $a_query);
 				$filters .= '</span></div>';
 			}
-			if (count($view -> query -> request_arguments['collection_filter']) > 0) {
+			if (isset($view -> query -> request_arguments['collection_filter']) && count($view -> query -> request_arguments['collection_filter']) > 0) {
 				// add remove options to filters
 				$a_toList = array();
 
 				foreach ($view->query->request_arguments['collection_filter'] as $index => $value) {
 					$temp_query = $orig_query;
-					unset($temp_query[collection_filter][$value]);
+					unset($temp_query['collection_filter'][$value]);
 					$a_toList[$value] = $temp_query;
 
 				}
@@ -677,23 +677,23 @@ function uconnect_form_query($array) {
 	if (!empty($array['term'])) {
 		$a_query[] = 'term=' . (string)$array['term'];
 	}
-	if (count($array['edLevel_filter'] > 0)) {
-		foreach ($array['edLevel_filter'] as $index => $value) {
+	if (isset($array['edLevel_filter']) && count($array['edLevel_filter'] > 0)) {
+		foreach ((array)$array['edLevel_filter'] as $index => $value) {
 			$a_query[] = 'edLevel_filter[]=' . $value;
 		}
 	}
-	if (count($array['type_filter'] > 0)) {
-		foreach ($array['type_filter'] as $index => $value) {
+	if (isset($array['type_filter']) && count($array['type_filter'] > 0)) {
+		foreach ((array)$array['type_filter'] as $index => $value) {
 			$a_query[] = 'type_filter[]=' . $value;
 		}
 	}
-	if (count($array['subject_filter'] > 0)) {
-		foreach ($array['subject_filter'] as $index => $value) {
+	if (isset($array['subject_filter']) && count($array['subject_filter'] > 0)) {
+		foreach ((array)$array['subject_filter'] as $index => $value) {
 			$a_query[] = 'subject_filter[]=' . $value;
 		}
 	}
-	if (count($array['collection_filter'] > 0)) {
-		foreach ($array['collection_filter'] as $index => $value) {
+	if (isset($array['collection_filter']) && count($array['collection_filter'] > 0)) {
+		foreach ((array)$array['collection_filter'] as $index => $value) {
 			$a_query[] = 'collection_filter[]=' . $value;
 		}
 	}
