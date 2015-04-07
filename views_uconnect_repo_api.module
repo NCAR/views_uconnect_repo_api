@@ -10,9 +10,26 @@ function views_uconnect_repo_api_views_api() {
  * Implements hook_theme().
  */
 function views_uconnect_repo_api_theme() {
-	return array('views_uconnect_repo_api_proxy_view' => array(
-			'variables' => array('url' => NULL),
-			'template' => 'views-uconnect-repo-api-proxy-view',
+	return array('views_uconnect_repo_api_detail_view' => array(
+			'variables' => array(
+				'id' => NULL,
+				'url' => NULL,
+				'title' => NULL,
+				'description' => NULL,
+				'license' => NULL,
+				'accessRights' => NULL,
+				'audience' => NULL,
+				'type' => NULL,
+				'format' => NULL,
+				'subject' => NULL,
+				'educationLevel' => NULL,
+				'language' => NULL,
+				'creator' => NULL,
+				'rights' => NULL,
+				'keyword' => NULL,
+				'img' => NULL
+			),
+			'template' => 'views-uconnect-repo-api-detail-view',
 		), );
 }
 
@@ -20,8 +37,8 @@ function views_uconnect_repo_api_theme() {
  * Implements hook_menu().
  */
 function views_uconnect_repo_api_menu() {
-	$items['proxy/search/%/%'] = array(
-		'title' => 'Search Proxy',
+	$items['search/details/%/%'] = array(
+		'title' => 'Search Resource Details',
 		'title callback' => 'views_uconnect_repo_api_title_callback',
 		'title arguments' => array(
 			2,
@@ -31,7 +48,7 @@ function views_uconnect_repo_api_menu() {
 			2,
 			3
 		),
-		'page callback' => 'views_uconnect_repo_api_proxy_view',
+		'page callback' => 'views_uconnect_repo_api_detail_view',
 		'access arguments' => array('access content'),
 		'type' => MENU_CALLBACK,
 	);
@@ -42,30 +59,187 @@ function views_uconnect_repo_api_menu() {
 /* get the title */
 function views_uconnect_repo_api_title_callback($arg1, $arg2) {
 	// retrieve title from API
+	$title = '';
+	
 	$id = $arg1 . '/' . $arg2;
 	$xml = views_uconnect_repo_api_get_record($id);
-	$title = (string)$xml -> GetRecord -> record -> metadata -> uconnect_dc -> title;
+	if(isset($xml -> GetRecord -> record)){
+		$title = (string)$xml -> GetRecord -> record -> metadata -> nsdl_dc -> title;
+	}
 	return $title;
 }
 
-function views_uconnect_repo_api_proxy_view($arg1, $arg2) {
-	// TODO: retrieve URL from API
-	// TODO: Display in an iframe
+function views_uconnect_repo_api_detail_view($arg1, $arg2) {
 	$results = '';
 	$id = $arg1 . '/' . $arg2;
-	//views_uconnect_repo_api_clear_record($id);
+	$nid = $repo_id = $keyword = $audience = $img = $conformsTo = $language = $creator = $rights = $type = $format = $subject = $educationLevel = $title = $description = $license = $accessRights = '';
+	$md = array();
 	$xml = views_uconnect_repo_api_get_record($id);
+	$base = $xml -> Search -> results -> record -> metadata -> nsdl_dc;
+	$identifiers = $base -> identifier;
 
-	$identifiers = $xml -> GetRecord -> record -> metadata -> uconnect_dc -> identifier;
+	foreach($xml -> Search -> results -> record -> storedContent -> content as $index=>$content){
+	
+		if(!array_key_exists((string)$content->attributes()->fieldName,$md)){
+			$md[(string)$content->attributes()->fieldName] = array();
+		} 
+		$md[(string)$content->attributes()->fieldName][] =(string)$content;
 
+	}
+	// ensure unique values
+	foreach($md as $index=>$values){
+		$md[$index] = array_unique($values);
+	}
+	
 	foreach ($identifiers as $index => $value) {
 		if ((string)$value -> attributes() -> type == 'dct:URI') {
 			$url = (string)$value;
 			break;
 		}
 	}
+	
+	if(isset($md['/text//nsdl_dc/type'])){
+		$temp = $md['/text//nsdl_dc/type'];
+		sort($temp);
+		$type = implode(', ',$temp);
+	}
+	
+	if(isset($md['/text//nsdl_dc/format'])){
+		$temp = $md['/text//nsdl_dc/format'];
+		sort($temp);
+		$format = implode(', ',$temp);
+	}
+	
+	if(isset($md['/text//nsdl_dc/subject'])){
+		$temp = $md['/text//nsdl_dc/subject'];
+		natsort($temp);
+		$subject = implode(', ',$temp);
+	}
+	
+	if(isset($md['/text//nsdl_dc/keyword'])){
+		$temp = $md['/text//nsdl_dc/keyword'];
+		natsort($temp);
+		$keyword = implode(', ',$temp);
+	}
+	
+	if(isset($md['/text//nsdl_dc/educationLevel'])){
+		$temp = $md['/text//nsdl_dc/educationLevel'];
+		$a_master_order = variable_get('uconnect_edlevel_master_order');
+		$a_temp_list = array();
+		foreach ($a_master_order as $index => $data) {
+			if (in_array($data, $temp)) {
+				$a_temp_list[] = $data;
+			}
+		}
+		$temp = $a_temp_list;
+		$educationLevel = implode(', ',$temp);
+	}
+	
+	if(isset($md['/text//nsdl_dc/title'])){
+		$temp = $md['/text//nsdl_dc/title'];
+		// pick first title
+		$title = $temp[0];
+	}
+	
+	if(isset($md['/text//nsdl_dc/description'])){
+		$temp = $md['/text//nsdl_dc/description'];
+		sort($temp);
+		$description = implode('',array_map(function($el){ return '<p>'.$el.'</p>';},$temp));
+	}
+	
+	if(isset($md['/text//nsdl_dc/license'])){
+		$temp = $md['/text//nsdl_dc/license'];
+		sort($temp);
+		$license = implode('',array_map(function($el){ return '<p>'.$el.'</p>';},$temp));
+	}
+	
+	if(isset($md['/text//nsdl_dc/accessRights'])){
+		$temp = $md['/text//nsdl_dc/accessRights'];
+		sort($temp);
+		$accessRights = implode('',array_map(function($el){ return '<p>'.$el.'</p>';},$temp));
+	}
+	
+	if(isset($md['/text//nsdl_dc/language'])){
+		$temp = $md['/text//nsdl_dc/language'];
+		sort($temp);
+		$language = implode('',array_map(function($el){ return '<p>'.$el.'</p>';},$temp));
+	}
+	
+	if(isset($md['/text//nsdl_dc/creator'])){
+		$temp = $md['/text//nsdl_dc/creator'];
+		sort($temp);
+		$creator = implode(', ',$temp);
+	}
+	
+	if(isset($md['/text//nsdl_dc/rights'])){
+		$temp = $md['/text//nsdl_dc/rights'];
+		sort($temp);
+		$rights = implode('',array_map(function($el){ return '<p>'.$el.'</p>';},$temp));
+	}
+	
+	if(isset($md['/text//nsdl_dc/conformsTo'])){
+		$temp = $md['/text//nsdl_dc/conformsTo'];
+		// need to resolve standards
+			$conformsTo = implode(', ',$temp);
+	}
 
-	$results = theme('views_uconnect_repo_api_proxy_view', array('url' => $url));
+	// also check uconnect_ed_resources to see if a picture exists.  Can searchby URL or id.
+	$query = new EntityFieldQuery;
+	$query->entityCondition('entity_type','node')
+	      ->entityCondition('bundle','ucar_education_resource')
+		  ->fieldCondition('field_url','value',$url);
+	$results = $query->execute();
+	if (isset($results['node']) && count($results['node']) > 0) {
+		 if(count($results['node']) > 1){
+		 	// if there are more than 1, send notice
+		 	watchdog('views_uconnect_repo_api', 'NOTICE: Resource has multiple entries in the Drupal database %url', array('%url' => $url), WATCHDOG_NOTICE);
+		 }
+
+	  $nodes = node_load_multiple(array_keys($results['node']));
+	
+	  foreach ($nodes as $node) {
+	    $img_value = field_get_items('node', $node, 'field_image');
+		$repo_id = field_get_items('node', $node, 'field_repository_id');
+	  	$nid = $node->nid;
+	  }
+
+	  // check if id exists, otherwise add it to node
+	  if(empty($repo_id)){
+	  	$node = node_load($nid);
+
+	    $node->field_repository_id[LANGUAGE_NONE][0]['value'] =$id;
+	    node_save($node);
+	  }
+	  
+	  if ($img_value) {
+		  // for displaying the original image
+		  $img_url = $img_value[0]['uri'];
+			$style = 'feature_medium_220x147px';
+			$img = image_style_url($style, $img_url);
+		}
+	}
+
+	
+	
+	drupal_set_title($title);
+	$results = theme('views_uconnect_repo_api_detail_view', array(
+		'id' => $id,
+		'url' => $url,
+		'title' => $title,
+		'description' => $description,
+		'license' => $license,
+		'accessRights' => $accessRights,
+		'audience' => $audience,
+		'type' => $type,
+		'format' => $format,
+		'subject' => $subject,
+		'educationLevel' => $educationLevel,
+		'language' => $language,
+		'creator' => $creator,
+		'rights' => $rights,
+		'conformsTo' => $conformsTo,
+		'img' => $img
+	));
 
 	return $results;
 
@@ -83,13 +257,13 @@ function views_uconnect_repo_api_get_record($id) {
 			$data = $cache -> data;
 		}
 		else {
-			// Do your expensive calculations here, and populate $my_data
-			// with the correct stuff..
-			$url = 'http://uc.dls.ucar.edu/search-api?verb=GetRecord&transform=localize&id=' . $id;
-
+			$general_stored_content = '&storedContent=/text//nsdl_dc/conformsTo&storedContent=/text//nsdl_dc/educationLevel&storedContent=/text//nsdl_dc/keyword&storedContent=/text//nsdl_dc/subject&storedContent=/text//nsdl_dc/type&storedContent=/text//nsdl_dc/description&storedContent=/text//nsdl_dc/title&storedContent.mode=multiRecord';
+			$record_stored_content = '&storedContent=commonComments&storedContent=/key//nsdl_dc/audience&storedContent=/text//nsdl_dc/accessRights&storedContent=/text//nsdl_dc/language&storedContent=/text//nsdl_dc/license&storedContent=/text//nsdl_dc/publisher&storedContent=/text//nsdl_dc/rights&storedContent=/text//nsdl_dc/creator&storedContent=/text//nsdl_dc/format';
+			$s_post_params = 'response=allCollectionsMetadata&transform=localize&verb=Search&n=10&s=0&q=/key//nsdl_dc/identifier:"hdl:'.$id.'"'.$record_stored_content.$general_stored_content;
+			$url = 'http://uc.dls.ucar.edu/search-api?'.$s_post_params;
+			
 			$results = drupal_http_request($url);
 			$data = $results -> data;
-			//note cannot store xml in cache
 			cache_set($id, $data, 'cache', time() + 360);
 
 		}
@@ -111,12 +285,12 @@ function views_uconnect_repo_api_views_pre_render(&$view) {
 			$orig_query = $view -> query -> request_arguments;
 
 			$filters = '<div class="view-result-filters"><h3>Your selections</h3>';
-			if (count($view -> query -> request_arguments['edLevel_filter']) > 0) {
+			if (isset($view -> query -> request_arguments['edLevel_filter']) && count($view -> query -> request_arguments['edLevel_filter']) > 0) {
 				// add remove options to filters
 				$a_toList = array();
 				$temp_query = $orig_query;
 				foreach ($view->query->request_arguments['edLevel_filter'] as $index => $value) {
-					unset($temp_query[edLevel_filter][$value]);
+					unset($temp_query['edLevel_filter'][$value]);
 					$a_toList[$value] = $temp_query;
 				}
 				$filters .= '<div class="view-result-filter"><span class="views-label">Education Level:</span> <span class="field_content">';
@@ -129,7 +303,7 @@ function views_uconnect_repo_api_views_pre_render(&$view) {
 				$filters .= '</span></div>';
 
 			}
-			if (count($view -> query -> request_arguments['type_filter']) > 0) {
+			if (isset($view -> query -> request_arguments['type_filter']) && count($view -> query -> request_arguments['type_filter']) > 0) {
 				// add remove options to filters
 				$a_toList = array();
 				$temp_query = $orig_query;
@@ -146,7 +320,7 @@ function views_uconnect_repo_api_views_pre_render(&$view) {
 				$filters .= implode(',', $a_query);
 				$filters .= '</span></div>';
 			}
-			if (count($view -> query -> request_arguments['subject_filter']) > 0) {
+			if (isset($view -> query -> request_arguments['subject_filter']) && count($view -> query -> request_arguments['subject_filter']) > 0) {
 				// add remove options to filters
 				$a_toList = array();
 				$temp_query = $orig_query;
@@ -163,13 +337,13 @@ function views_uconnect_repo_api_views_pre_render(&$view) {
 				$filters .= implode(',', $a_query);
 				$filters .= '</span></div>';
 			}
-			if (count($view -> query -> request_arguments['collection_filter']) > 0) {
+			if (isset($view -> query -> request_arguments['collection_filter']) && count($view -> query -> request_arguments['collection_filter']) > 0) {
 				// add remove options to filters
 				$a_toList = array();
 
 				foreach ($view->query->request_arguments['collection_filter'] as $index => $value) {
 					$temp_query = $orig_query;
-					unset($temp_query[collection_filter][$value]);
+					unset($temp_query['collection_filter'][$value]);
 					$a_toList[$value] = $temp_query;
 
 				}
@@ -241,24 +415,24 @@ function views_uconnect_repo_api_views_pre_render(&$view) {
 			$query_str .= 'term=';
 		}
 		if (isset($exposed_data['edLevel_filter']) && count($exposed_data['edLevel_filter']) > 0) {
-			foreach ($exposed_data['edLevel_filter'] as $index => $value) {
+			foreach ((array)$exposed_data['edLevel_filter'] as $index => $value) {
 				$query_str .= '&edLevel_filter[]=' . $value;
 			}
 		}
 		if (isset($exposed_data['type_filter']) && count($exposed_data['type_filter']) > 0) {
-			foreach ($exposed_data['type_filter'] as $index => $value) {
+			foreach ((array)$exposed_data['type_filter'] as $index => $value) {
 				$query_str .= '&type_filter[]=' . $value;
 			}
 		}
 
 		if (isset($exposed_data['subject_filter']) && count($exposed_data['subject_filter']) > 0) {
-			foreach ($exposed_data['subject_filter'] as $index => $value) {
+			foreach ((array)$exposed_data['subject_filter'] as $index => $value) {
 				$query_str .= '&subject_filter[]=' . $value;
 			}
 		}
 
 		if (isset($exposed_data['collection_filter']) && count($exposed_data['collection_filter']) > 0) {
-			foreach ($exposed_data['collection_filter'] as $index => $value) {
+			foreach ((array)$exposed_data['collection_filter'] as $index => $value) {
 				$query_str .= '&collection_filter[]=' . $value;
 			}
 		}
@@ -268,7 +442,7 @@ function views_uconnect_repo_api_views_pre_render(&$view) {
 
 			foreach ($value->items->subject as $sub_index => $sub_value) {
 				// check if term is already in filters
-				if (isset($exposed_data['subject_filter']) && !in_array($sub_value, $exposed_data['subject_filter'])) {
+				if (isset($exposed_data['subject_filter']) && !in_array($sub_value, (array)$exposed_data['subject_filter'])) {
 					$search_url = $search_base_url . '&subject_filter[]=' . $sub_value;
 					$view -> result[$index] -> items -> subject[$sub_index] = '<a href="' . $search_url . '">' . $sub_value . '</a>';
 				}
@@ -503,23 +677,23 @@ function uconnect_form_query($array) {
 	if (!empty($array['term'])) {
 		$a_query[] = 'term=' . (string)$array['term'];
 	}
-	if (count($array['edLevel_filter'] > 0)) {
-		foreach ($array['edLevel_filter'] as $index => $value) {
+	if (isset($array['edLevel_filter']) && count($array['edLevel_filter'] > 0)) {
+		foreach ((array)$array['edLevel_filter'] as $index => $value) {
 			$a_query[] = 'edLevel_filter[]=' . $value;
 		}
 	}
-	if (count($array['type_filter'] > 0)) {
-		foreach ($array['type_filter'] as $index => $value) {
+	if (isset($array['type_filter']) && count($array['type_filter'] > 0)) {
+		foreach ((array)$array['type_filter'] as $index => $value) {
 			$a_query[] = 'type_filter[]=' . $value;
 		}
 	}
-	if (count($array['subject_filter'] > 0)) {
-		foreach ($array['subject_filter'] as $index => $value) {
+	if (isset($array['subject_filter']) && count($array['subject_filter'] > 0)) {
+		foreach ((array)$array['subject_filter'] as $index => $value) {
 			$a_query[] = 'subject_filter[]=' . $value;
 		}
 	}
-	if (count($array['collection_filter'] > 0)) {
-		foreach ($array['collection_filter'] as $index => $value) {
+	if (isset($array['collection_filter']) && count($array['collection_filter'] > 0)) {
+		foreach ((array)$array['collection_filter'] as $index => $value) {
 			$a_query[] = 'collection_filter[]=' . $value;
 		}
 	}
